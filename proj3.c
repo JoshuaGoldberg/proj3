@@ -18,9 +18,9 @@ int processID;
 char hostName[100];
 int membership[100];
 int membershipCount = 0;
-int view_id = 0;
+int view_id = 1;
 int upd_socket = 0;
-int request_id = 0;
+int request_id = 1;
 time_t lastHeartbeat[100];
 int crash_delay = 0;
 int crash = 0;
@@ -195,6 +195,7 @@ int connectTCP(const char * host) {
     return socket_desc;
 }
 
+// thread for sending heartbeats to other peers
 void *heartbeat_send_thread(void *arg) {
     while(1) {
         sleep(HEARTBEAT_TIME);
@@ -212,6 +213,7 @@ void *heartbeat_send_thread(void *arg) {
 
 }
 
+// thread for receiving and updating heartbeats from other peers
 void *heartbeat_receive_thread(void *arg) {
 
     while(1) {
@@ -231,6 +233,7 @@ void *heartbeat_receive_thread(void *arg) {
     }
 }
 
+// thread logic for checking if a process has crashed, and dealing with it as needed
 void *track_heartbeat_thread(void *arg) {
 
     while(1) {
@@ -301,6 +304,7 @@ void *track_heartbeat_thread(void *arg) {
     }
 }
 
+// handles the addition of a member to the membership list
 void add_handler(int join_id) {
     // need to gather accepts. first choose a suitable request_id
     request_id += 1;
@@ -387,6 +391,7 @@ void add_handler(int join_id) {
     print_view_status();
 }
 
+// handles the deletion of a peer from the membership list
 void delete_handler(int peer_id) {
 
     // need to gather accepts. first choose a suitable request_id
@@ -496,12 +501,14 @@ void delete_handler(int peer_id) {
     print_view_status();
 }
 
+// crashes the program after a specified delay
 void *crash_thread(void *arg) {
     sleep(crash_delay);
     fprintf(stderr, "{peer_id:%d, view_id: %d, leader: %d, message:\"crashing\"}\n", processID, view_id, leader);
     exit(0);
 }
 
+// crashes the leader after all peers join, and after the leader sends a delete message
 void *leader_crash_thread(void *arg) {
     while(1) {
 
@@ -516,6 +523,7 @@ void *leader_crash_thread(void *arg) {
     }
 }
 
+// main logic
 int main(int argc, char const *argv[]) {
     memset(membership, -1, sizeof(membership));
     // first, we take a trip down proj1 memory lane   
@@ -598,7 +606,7 @@ int main(int argc, char const *argv[]) {
     } else {
         membership[0] = 1;
         membershipCount = 1;
-        view_id = 0;
+        view_id = 1;
         print_view_status();
 
         if(leader_crash_protocol == 1) {
@@ -837,7 +845,8 @@ int main(int argc, char const *argv[]) {
         } else if(buff.msgType == LEADER_CRASH && processID == leader) {
 
             request_id += 1;
-
+            
+            // decides to delete 5
             message_t final_msg;
             final_msg.msgType = REQ;
             final_msg.req_id = request_id;
